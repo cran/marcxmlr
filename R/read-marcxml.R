@@ -1,6 +1,20 @@
-.parse_marcxml_text_chunk <- function(record_texts, record_ids) {
+.parse_marcxml_text_chunk <- function(
+  record_texts,
+  record_ids,
+  source_file = NULL
+) {
+  native <- .native_marcxml_records(record_texts, record_ids)
+  if (!is.null(native)) {
+    return(native)
+  }
+
   parsed <- purrr::map(record_ids, function(record_id) {
-    parse_marcxml_record(record_texts[[record_id]], record_id)
+    .parse_marcxml_record_with_context(
+      record = record_texts[[record_id]],
+      record_id = record_id,
+      source_file = source_file,
+      record_number = record_id
+    )
   })
 
   .bind_marcxml_results(parsed)
@@ -19,7 +33,10 @@
     record_names <- xml2::xml_name(records)
     record_namespaces <- xml2::xml_find_chr(
       records,
-      "namespace-uri(.)"
+      "namespace-uri(.)",
+      # No prefixes occur in this XPath. Automatic xml_ns(records) can scan
+      # the same document repeatedly, once per node in the nodeset.
+      ns = character()
     )
     invalid_records <- record_names != "record" |
       record_namespaces != root_namespace
@@ -71,8 +88,10 @@
 #' returns one row for each leader, control field, or data-field subfield. It
 #' preserves repeated fields, repeated subfields, indicators, and source order.
 #'
-#' This function materializes both the XML input and the parsed result in
-#' memory. Use [marcxml_to_parquet()] for catalogues that may not fit in memory.
+#' This function materializes the parsed result in memory. On the supported
+#' sequential native path it does not build a DOM for the complete XML input;
+#' compatibility fallbacks may do so. Use [marcxml_to_parquet()] for catalogues
+#' whose canonical result may not fit in memory.
 #'
 #' @param file Path to a MARCXML file.
 #' @param n_max Maximum number of records to parse. Use `Inf` for every record
@@ -100,9 +119,16 @@
 #' within the same field. Structural columns that do not apply to leaders or
 #' control fields are `NA`.
 #'
-#' Parallel parsing serializes complete records before dispatch. `xml2`
-#' external pointers are never sent to worker processes. The caller's previous
-#' future plan is restored when parsing finishes or fails.
+#' With `workers = 1` and default `chunk_records = NULL`, supported ordinary
+#' input uses a two-pass native
+#' libxml2 engine: the first pass validates and counts selected records and the
+#' second fills the canonical columns directly from expanded record nodes. No
+#' record XML is serialized or reparsed on this path. Unsupported input falls
+#' back to the reference `xml2` implementation.
+#'
+#' Parallel parsing retains the established serialized-record implementation.
+#' `xml2`/libxml2 external pointers are never sent to worker processes. The
+#' caller's previous future plan is restored when parsing finishes or fails.
 #'
 #' @examples
 #' example_file <- system.file(
@@ -143,6 +169,22 @@ read_marcxml <- function(
   n_max <- .validate_n_max(n_max)
   workers <- .validate_workers(workers)
   chunk_records <- .validate_chunk_records(chunk_records)
+
+  # Prefer the direct two-pass native engine for sequential reading. The
+  # existing serialized-record/R parser remains authoritative when planning
+  # conservatively declines an input. Parallel calls retain the established
+  # worker-safe path.
+  if (workers == 1L && is.null(chunk_records)) {
+    direct <- .native_marcxml_direct_read(
+      file = file,
+      n_max = n_max
+    )
+
+    if (!is.null(direct)) {
+      return(direct)
+    }
+  }
+
   record_texts <- .extract_marcxml_record_texts(file = file, n_max = n_max)
   record_count <- length(record_texts)
 
@@ -159,7 +201,11 @@ read_marcxml <- function(
 
   if (effective_workers == 1L) {
     parsed_chunks <- purrr::map(record_chunks, function(record_ids) {
-      .parse_marcxml_text_chunk(record_texts, record_ids)
+      .parse_marcxml_text_chunk(
+        record_texts,
+        record_ids,
+        source_file = file
+      )
     })
 
     return(.bind_marcxml_results(parsed_chunks))
@@ -174,7 +220,11 @@ read_marcxml <- function(
   shared_record_texts <- mori::share(record_texts)
 
   parsed_chunks <- purrr::map(record_chunks, function(record_ids) {
-    .parse_marcxml_text_chunk(shared_record_texts, record_ids)
+    .parse_marcxml_text_chunk(
+      shared_record_texts,
+      record_ids,
+      source_file = file
+    )
   }) |>
     futurize::futurize()
 

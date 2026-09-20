@@ -1,6 +1,6 @@
 Package: marcxmlr
 Title: Faithful and Scalable MARCXML Parsing
-Version: 0.1.0
+Version: 0.2.1
 Authors@R: 
     person("Lorenzo", "Isella", email = "lorenzo.isella@gmail.com",
            role = c("aut", "cre"))
@@ -18,13 +18,15 @@ Encoding: UTF-8
 Language: en-US
 RoxygenNote: 7.3.2
 Depends: R (>= 4.1.0)
-Imports: purrr (>= 1.0.0), stats, tibble (>= 3.0.0), xml2 (>= 1.3.0)
+Imports: purrr (>= 1.0.0), rlang, stats, tibble (>= 3.0.0), xml2 (>=
+        1.3.0)
 Suggests: arrow, dplyr, future (>= 1.69.0), future.mirai, futurize,
         furrr, mori, testthat (>= 3.0.0), XML
 Config/testthat/edition: 3
-NeedsCompilation: no
-Packaged: 2026-09-03 12:52:42 UTC; lorenzo
+SystemRequirements: libxml2 (>= 2.9.0)
+NeedsCompilation: yes
+Packaged: 2026-09-19 09:43:16 UTC; lorenzo
 Author: Lorenzo Isella [aut, cre]
 Maintainer: Lorenzo Isella <lorenzo.isella@gmail.com>
 Repository: CRAN
-Date/Publication: 2026-09-12 14:30:02 UTC
+Date/Publication: 2026-09-20 00:40:02 UTC

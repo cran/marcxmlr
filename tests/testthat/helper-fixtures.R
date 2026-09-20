@@ -31,3 +31,28 @@ sort_canonical <- function(x) {
   subfield_position <- ifelse(is.na(x$subfield_order), 0L, x$subfield_order)
   x[order(x$record_id, x$field_order, subfield_position), canonical_columns]
 }
+
+reference_read <- function(...) {
+  old <- options(marcxmlr.native = FALSE)
+  on.exit(options(old))
+  read_marcxml(...)
+}
+
+native_read <- function(...) {
+  # Keep the pre-direct native parser as an independent regression oracle.
+  old <- options(
+    marcxmlr.native = TRUE,
+    marcxmlr.direct = FALSE
+  )
+  on.exit(options(old))
+  read_marcxml(...)
+}
+
+direct_read <- function(...) {
+  old <- options(
+    marcxmlr.native = TRUE,
+    marcxmlr.direct = TRUE
+  )
+  on.exit(options(old))
+  read_marcxml(...)
+}
