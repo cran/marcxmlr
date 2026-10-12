@@ -1,3 +1,19 @@
+# marcxmlr 0.4.0
+
+* Add optional native malformed-record recovery to `read_marcxml()` and
+  `marcxml_to_parquet()` through `on_marc_error = "skip"`.
+* Skip complete malformed MARC records while preserving source-position
+  `record_id` gaps and writing an audit report with the source record,
+  control number, diagnostic reason, and original record XML.
+* Keep XML syntax and encoding errors fatal. The default strict native parsing
+  path remains unchanged.
+
+* Extend `diagnose_canonical()` to Arrow Datasets and lazy Arrow queries,
+  enabling bounded-memory structural validation without collecting the
+  complete dataset.
+* Preserve diagnostic behaviour across Arrow batches, including record
+  boundaries and warnings about record IDs that would be renumbered.
+
 # marcxmlr 0.3.1
 
 * Add transparent gzip output support to `write_marcxml()` for filenames
